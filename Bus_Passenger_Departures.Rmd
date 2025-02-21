@@ -1,0 +1,176 @@
+---
+title: "Bus & Passengers Departures"
+author: "Sai Rahul Chirra"
+date: "2024-05-01"
+output: html_document
+---
+
+# Data Preprocessing
+
+#Importing the Dataset
+```{r}
+dataset <- read.csv('externalfactors.csv')
+```
+
+#Splitting the Dataset into Training set and Test Set
+```{r}
+library(caTools)
+set.seed(123)
+split = sample.split(dataset$Gas_Price, SplitRatio = 0.75)
+training_set = subset(dataset, split == TRUE)
+test_set = subset(dataset, split == FALSE)
+```
+
+#Fitting Simple Linear Regression to Training set
+```{r}
+regressor = lm(formula = Gas_Price ~ Total_Bus_Departures, 
+               data = training_set)
+summary(regressor)
+
+```
+
+```{r}
+y_pred <- predict(regressor, newdata = test_set) 
+```
+
+#Visualizing the Training set results
+```{r}
+library(ggplot2)
+#install library if missing package
+# we are going to add components: 1. observations points
+ggplot() + 
+  geom_point(aes(x = training_set$Total_Bus_Departures, y = training_set$Gas_Price),
+             colour = 'red') +
+  geom_line(aes(x = training_set$Total_Bus_Departures, y = predict(regressor, newdata = training_set) ),
+            colour = 'blue') + 
+  ggtitle('Gas_Price VS Bus_Departures (Training set)') + 
+  xlab('Total_Bus_Departures') + 
+  ylab('Gas_Price')
+```
+
+```{r}
+library(ggplot2)
+#install library if missing package
+# we are going to add components: 1. observations points
+ggplot() + 
+  geom_point(aes(x = training_set$Total_Passenger_Departures, y = training_set$Gas_Price),
+             colour = 'red') +
+  geom_line(aes(x = training_set$Total_Passenger_Departures, y = predict(regressor, newdata = training_set) ),
+            colour = 'blue') + 
+  ggtitle('Gas_Price VS Passengers_Departures (Training set)') + 
+  xlab('Total_Passengers_Departures') + 
+  ylab('Gas_Price')
+```
+```{r}
+regressor_temp_Bus = lm(formula = Temperature ~ Total_Bus_Departures, 
+               data = training_set)
+summary(regressor_temp_Bus)
+```
+
+```{r}
+regressor_temp_passenger = lm(formula = Temperature ~ Total_Passenger_Departures, 
+               data = training_set)
+summary(regressor_temp_passenger)
+```
+
+```{r}
+library(ggplot2)
+#install library if missing package
+# we are going to add components: 1. observations points
+ggplot() + 
+  geom_point(aes(x = training_set$Total_Bus_Departures, y = training_set$Temperature),
+             colour = 'red') +
+  geom_line(aes(x = training_set$Total_Bus_Departures, y = predict(regressor_temp_Bus, newdata = training_set) ),
+            colour = 'blue') + 
+  ggtitle('Temperature VS Bus_Departures (Training set)') + 
+  xlab('Total_Bus_Departures') + 
+  ylab('Temperature')
+```
+
+```{r}
+library(ggplot2)
+#install library if missing package
+# we are going to add components: 1. observations points
+ggplot() + 
+  geom_point(aes(x = training_set$Total_Passenger_Departures, y = training_set$Temperature),
+             colour = 'red') +
+  geom_line(aes(x = training_set$Total_Passenger_Departures, y = predict(regressor_temp_passenger, newdata = training_set) ),
+            colour = 'blue') + 
+  ggtitle('Temperature VS Passenger_Departures (Training set)') + 
+  xlab('Total_Passengers_Departures') + 
+  ylab('Temperature')
+```
+
+
+
+```{r}
+library(forecast)
+
+terminal_data <- data.frame(
+  Date = seq(as.Date("2020-01-01"), by = "months", length.out = 33),  
+  Usage = c(100, 120, 150, 130, 160, 180, 200, 220, 250, 230, 260, 280, 300, 320, 350, 330, 360, 380, 400, 420, 450, 430, 460, 480, 500, 520, 550, 530, 560, 580, 600, 620, 650)
+)
+```
+
+```{r}
+ts_data <- ts(terminal_data$Usage, frequency = 12)
+arima_model <- auto.arima(ts_data)
+```
+
+```{r}
+forecast_values <- forecast(arima_model, h = 120)
+plot(forecast_values, main = "Bus Terminal Usage Forecast", xlab = "Year", ylab = "Usage")
+lines(ts_data, col = "blue", lty = 1)
+```
+
+```{r}
+library(dplyr)
+terminal_data <- data.frame(
+  Date = seq(as.Date("2020-01-01"), by = "months", length.out = 33),
+  Carrier = rep(c("Inner City", "Commuter", "NJ Transit"), each = 11),
+  Usage = c(
+    # Inner City
+    100, 120, 150, 130, 160, 180, 200, 220, 250, 230, 260,
+    # Commuter
+    280, 300, 320, 350, 330, 360, 380, 400, 420, 450, 430,
+    # NJ Transit
+    460, 480, 500, 520, 550, 530, 560, 580, 600, 620, 650
+  )
+)
+```
+
+```{r}
+external_factors <- data.frame(
+  Date = seq(as.Date("2020-01-01"), by = "months", length.out = 33),
+  Snowstorms = c(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+  UN_Events = c(0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0),
+  Strikes = c(0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
+  Gas_Prices = c(2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5)
+)
+
+merged_data <- merge(terminal_data, external_factors, by = "Date")
+```
+
+```{r}
+ts_data <- ts(merged_data$Usage, frequency = 12)
+lm_model <- lm(Usage ~ Carrier + Snowstorms + UN_Events + Strikes + Gas_Prices, data = merged_data)
+forecast_data <- data.frame(
+  Date = seq(as.Date("2023-01-01"), by = "months", length.out = 120),
+  Carrier = rep(c("Inner City", "Commuter", "NJ Transit"), each = 40),  # Adjust based on your needs
+  Snowstorms = rep(0, 120),
+  UN_Events = rep(0, 120),
+  Strikes = rep(0, 120),
+  Gas_Prices = rep(3.5, 120)  # Adjust based on your needs
+)
+
+```
+
+```{r}
+forecast_values <- predict(lm_model, newdata = forecast_data)
+
+plot(forecast_values, type = "l", col = "blue", lty = 1, lwd = 2,
+     main = "Bus Terminal Usage Forecast with External Factors",
+     xlab = "Year", ylab = "Usage")
+
+legend("topright", legend = unique(merged_data$Carrier), col = 1:3, lty = 1:3, cex = 0.8)
+```
